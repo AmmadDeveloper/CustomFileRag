@@ -1,0 +1,10 @@
+redis
+anthropic
+pypdf
+langchain
+python-dotenv
+scipy
+numpy
+requests
+transformers
+torch
