@@ -5,6 +5,7 @@ This script demonstrates how to use the RAG pipeline to:
 1. Ingest PDF documents
 2. Query the knowledge base
 3. Get responses based on the document content
+4. Use different LLM models (Claude or OpenAI)
 
 Usage:
 1. Set up your environment variables in .env file
@@ -12,10 +13,12 @@ Usage:
 3. Run this script: python demo.py
 """
 import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
 from src.rag import RAGPipeline
+from src.llm import LLMFactory
 
 # Load environment variables
 load_dotenv()
@@ -25,20 +28,30 @@ def main():
     data_dir = Path("data")
     data_dir.mkdir(exist_ok=True)
 
+    # Determine which LLM provider to use
+    if len(sys.argv) > 1 and sys.argv[1].lower() == "openai":
+        llm_provider = "openai"
+        llm_model_name = "gpt-4.1-nano"  # OpenAI's o1-nano model
+        print(f"""Using OpenAI {llm_model_name} model""")
+    else:
+        llm_provider = "claude"
+        llm_model_name = "claude-3-haiku-20240307"
+        print("Using Claude model (default)")
+
     # Initialize RAG pipeline
     print("Initializing RAG pipeline...")
     rag_pipeline = RAGPipeline(
-        # Using E5 embeddings instead of BERT for better performance
-        # E5 is a state-of-the-art open-source embedding model from Microsoft
-        # that outperforms BERT and MiniLM on various benchmarks
-        embedding_model_name="e5",
-        index_name="demo_e5",
-        llm_model="claude-3-haiku-20240307",
-        max_tokens=1000,
-        temperature=0.7,
-        chunk_size=1000,
+        # Using OpenAI embeddings
+        embedding_model_name="openai",
+        index_name=f"demo_{llm_provider}",
+        # Using the factory pattern for LLM models
+        llm_provider=llm_provider,
+        llm_model_name=llm_model_name,
+        max_tokens=700,
+        temperature=0.5,
+        chunk_size=2000,
         chunk_overlap=200,
-        top_k=100
+        top_k=5
     )
 
     # Check if there are PDF files in the data directory

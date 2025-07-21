@@ -4,10 +4,10 @@ RAG (Retrieval-Augmented Generation) pipeline implementation.
 import os
 from typing import List, Dict, Any, Optional, Union
 from pathlib import Path
-import anthropic
 from dotenv import load_dotenv
 
 from ..embeddings import EmbeddingFactory, EmbeddingModel
+from ..llm import LLMFactory, LLMModel
 from ..vectorstore import RedisVectorStore
 from ..document_loaders import PDFLoader
 
@@ -25,7 +25,9 @@ class RAGPipeline:
         embedding_model_name: str = "bert",
         vector_store: Optional[RedisVectorStore] = None,
         index_name: str = "rag_index",
-        llm_model: str = "claude-3-haiku-20240307",
+        llm_model: Optional[LLMModel] = None,
+        llm_provider: str = "claude",
+        llm_model_name: str = "claude-3-haiku-20240307",
         max_tokens: int = 1000,
         temperature: float = 0.7,
         chunk_size: int = 1000,
@@ -41,7 +43,9 @@ class RAGPipeline:
             embedding_model_name: Name of the embedding model to use if creating a new one
             vector_store: Vector store instance. If not provided, one will be created
             index_name: Name of the index to use in the vector store
-            llm_model: Claude model to use for generation
+            llm_model: LLM model instance. If not provided, one will be created
+            llm_provider: Provider for the LLM model ("claude" or "openai")
+            llm_model_name: Name of the LLM model to use if creating a new one
             max_tokens: Maximum number of tokens to generate
             temperature: Temperature for generation
             chunk_size: Size of text chunks in characters
@@ -71,13 +75,14 @@ class RAGPipeline:
             chunk_overlap=chunk_overlap
         )
 
-        # Initialize LLM client
-        self.api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if not self.api_key:
-            raise ValueError("Anthropic API key must be set as ANTHROPIC_API_KEY environment variable")
-
-        self.llm_client = anthropic.Anthropic(api_key=self.api_key)
+        # Initialize LLM model
         self.llm_model = llm_model
+        if self.llm_model is None:
+            self.llm_model = LLMFactory.create_llm_model(
+                llm_provider,
+                model=llm_model_name
+            )
+
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.top_k = top_k
@@ -204,17 +209,12 @@ class RAGPipeline:
             Answer:
         """
 
-        # Generate response
-        response = self.llm_client.messages.create(
-            model=self.llm_model,
+        # Generate response using the LLM model
+        return self.llm_model.generate(
+            prompt=prompt,
             max_tokens=self.max_tokens,
-            temperature=self.temperature,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
+            temperature=self.temperature
         )
-
-        return response.content[0].text
 
     def query(self, query: str, filter_metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
